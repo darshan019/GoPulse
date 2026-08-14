@@ -36,7 +36,7 @@ func (q *jobQueue) processJob(job Job) error {
 }
 
 func (q *jobQueue) startWorkers(workers int) {
-	for i := range workers {
+	for i := 0; i < range workers; i++ {
 		go func() {
 			for job := range q.queue {
 				fmt.Println("Worker: " + fmt.Sprint(i))
