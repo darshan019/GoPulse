@@ -71,4 +71,6 @@ func main() {
 	q.wg.Wait()
 
 	fmt.Println("All jobs processed in:", time.Since(start))
+
+	close(q.queue)
 }
