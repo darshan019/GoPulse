@@ -6,11 +6,20 @@ import (
 	"time"
 )
 
+type JobStatus string
+
+const (
+	Pending   JobStatus = "PENDING"
+	Processing JobStatus = "PROCESSING"
+	Completed JobStatus = "COMPLETED"
+	Failed    JobStatus = "FAILED"
+)
+
 type Job struct {
 	id         int
 	jobType    string
 	payload    string
-	status     string
+	status     JobStatus
 	createdAt  time.Time
 	maxRetries int
 	retryCount int
@@ -32,9 +41,11 @@ func (q *jobQueue) enqueue(job Job) {
 	q.queue <- job
 }
 
-func (q *jobQueue) processJob(job Job) error {
+func (q *jobQueue) processJob(job *Job) error {
+    job.status = Processing
 	time.Sleep(1 * time.Second) // Simulate job processing time
 	fmt.Printf("Processing job: %s, payload: %s\n", job.jobType, job.payload)
+	job.status = Completed
 	return nil
 }
 
@@ -43,7 +54,8 @@ func (q *jobQueue) startWorkers(workers int) {
 		go func(workerID int) {
 			for job := range q.queue {
 				fmt.Printf("Worker: %d\n", workerID)
-				if err := q.processJob(job); err != nil {
+				if err := q.processJob(&job); err != nil {
+				    job.status = Failed
 					fmt.Printf("Worker: %d failed to process job: %d\n", workerID, job.id)
 					if job.retryCount < job.maxRetries {
 						job.retryCount++
@@ -65,7 +77,7 @@ func main() {
 		id:         1,
 		jobType:    "send_mail",
 		payload:    "some payload to send",
-		status:     "pending",
+		status:     Pending,
 		createdAt:  time.Now(),
 		maxRetries: 3,
 		retryCount: 0,
@@ -76,6 +88,7 @@ func main() {
 	q.startWorkers(5)
 
 	for i := 0; i < 20; i++ {
+	    job.id = i
 		q.enqueue(job)
 	}
 
