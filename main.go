@@ -37,9 +37,10 @@ func (q *jobQueue) processJob(job Job) error {
 
 func (q *jobQueue) startWorkers(workers int) {
 	for i := 0; i < range workers; i++ {
+		workerID := i;
 		go func() {
 			for job := range q.queue {
-				fmt.Println("Worker: " + fmt.Sprint(i))
+				fmt.Println("Worker: " + workerID)
 				if q.processJob(job) != nil {
 					fmt.Println("worker failed to process job: " + fmt.Sprint(job.id))
 				}
