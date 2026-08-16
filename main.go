@@ -20,13 +20,13 @@ const (
 )
 
 type Job struct {
-	id         int
-	jobType    string
-	payload    string
-	status     JobStatus
-	createdAt  time.Time
-	maxRetries int
-	retryCount int
+	id           int
+	jobType      string
+	payload      string
+	status       JobStatus
+	createdAt    time.Time
+	maxAttempts  int
+	attemptCount int
 }
 
 type jobQueue struct {
@@ -65,8 +65,8 @@ func (database *jobRepository) createJobTable() {
         payload TEXT NOT NULL,
         status TEXT NOT NULL,
         created_at DATETIME NOT NULL,
-        max_retries INTEGER NOT NULL,
-        retry_count INTEGER NOT NULL
+        max_attempts INTEGER NOT NULL,
+        attempt_count INTEGER NOT NULL
     )
 	`)
 	if err != nil {
@@ -77,7 +77,7 @@ func (database *jobRepository) createJobTable() {
 func (database *jobRepository) updateJobStatus(job *Job) {
 	database.mu.Lock()
 	defer database.mu.Unlock()
-	_, err := database.db.Exec(`UPDATE jobs SET status = ?, retry_count = ? WHERE id = ?`, job.status, job.retryCount, job.id)
+	_, err := database.db.Exec(`UPDATE jobs SET status = ?, attempt_count = ? WHERE id = ?`, job.status, job.attemptCount, job.id)
 
 	if err != nil {
 		panic(err)
@@ -93,8 +93,8 @@ func (database *jobRepository) createJob(job *Job) {
 			payload,
 			status,
 			created_at,
-			max_retries,
-			retry_count
+			max_attempts,
+			attempt_count
 		)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`,
@@ -102,9 +102,13 @@ func (database *jobRepository) createJob(job *Job) {
 		job.payload,
 		job.status,
 		job.createdAt,
-		job.maxRetries,
-		job.retryCount,
+		job.maxAttempts,
+		job.attemptCount,
 	)
+
+	if err != nil {
+		panic(err)
+	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
@@ -140,6 +144,7 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 			for job := range q.queue {
 				fmt.Printf("Worker: %d\n", workerID)
 				job.status = Processing
+				job.attemptCount++
 				repo.updateJobStatus(job)
 
 				if err := q.processJob(job); err != nil {
@@ -147,15 +152,14 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 					repo.updateJobStatus(job)
 					fmt.Printf("Worker: %d failed to process job: %d\n", workerID, job.id)
 
-					if job.retryCount < job.maxRetries {
-						job.retryCount++
+					if job.attemptCount < job.maxAttempts {
 						job.status = Pending
 						repo.updateJobStatus(job)
 
 						q.wg.Add(1)
 						q.queue <- job
 					} else {
-						fmt.Printf("Worker: %d job: %d reached max retries\n", workerID, job.id)
+						fmt.Printf("Worker: %d job: %d reached max attempts\n", workerID, job.id)
 					}
 				} else {
 					job.status = Completed
@@ -189,23 +193,20 @@ func main() {
 	scheduler := Scheduler{repository: &database, tasks: q}
 
 	scheduler.start(5)
-	// q.startWorkers(5)
 
 	for i := 0; i < 20; i++ {
 		job := Job{
-			jobType:    "send_mail",
-			payload:    "some payload to send",
-			status:     Pending,
-			createdAt:  time.Now(),
-			maxRetries: 3,
-			retryCount: 0,
+			jobType:      "send_mail",
+			payload:      "some payload to send",
+			status:       Pending,
+			createdAt:    time.Now(),
+			maxAttempts:  3,
+			attemptCount: 0,
 		}
-		// database.createJob(job)
-		// q.enqueue(&job)
+
 		scheduler.submitJob(&job)
 	}
 
-	// q.wg.Wait()
 	scheduler.Wait()
 
 	fmt.Println("All jobs processed in:", time.Since(start))
