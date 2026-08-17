@@ -57,8 +57,8 @@ func (scheduler *Scheduler) submitRecoveredJobs() error {
 	return nil
 }
 
-func (scheduler *Scheduler) cleanUpCompletedJobs() {
-	scheduler.repository.cleanCompletedJobs()
+func (scheduler *Scheduler) cleanUpCompletedJobs() error {
+	return scheduler.repository.cleanCompletedJobs()
 }
 
 func (scheduler *Scheduler) submitJob(job *Job) {
@@ -92,19 +92,16 @@ func (database *jobRepository) createJobTable() {
 }
 
 func (database *jobRepository) cleanCompletedJobs() error {
-	res, err := database.db.Exec(`
-		DELETE FROM jobs WHERE status = "COMPLETED"
-	`)
+	res, err := database.db.Exec("DELETE FROM jobs WHERE status = ?", Completed)
 	if err != nil {
 		return err
 	}
 	numOfCleanup, err := res.RowsAffected()
-	fmt.Printf("Num of completed tasks removed is: %d\n", numOfCleanup)
-
 	if err != nil {
 		return err
 	}
 
+	fmt.Printf("Num of completed tasks removed is: %d\n", numOfCleanup)
 	return nil
 }
 
@@ -272,7 +269,9 @@ func main() {
 
 	scheduler := Scheduler{repository: &database, tasks: q}
 
-	scheduler.cleanUpCompletedJobs()
+	if err := scheduler.cleanUpCompletedJobs(); err != nil {
+		panic(err)
+	}
 
 	scheduler.start(5)
 
