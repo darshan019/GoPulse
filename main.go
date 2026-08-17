@@ -61,9 +61,12 @@ func (scheduler *Scheduler) cleanUpCompletedJobs() error {
 	return scheduler.repository.cleanCompletedJobs()
 }
 
-func (scheduler *Scheduler) submitJob(job *Job) {
-	scheduler.repository.createJob(job)
+func (scheduler *Scheduler) submitJob(job *Job) error {
+	if err := scheduler.repository.createJob(job); err != nil {
+		return err
+	}
 	scheduler.tasks.enqueue(job)
+	return nil
 }
 
 func (scheduler *Scheduler) start(workers int) {
@@ -74,7 +77,7 @@ func (scheduler *Scheduler) Wait() {
 	scheduler.tasks.wg.Wait()
 }
 
-func (database *jobRepository) createJobTable() {
+func (database *jobRepository) createJobTable() error {
 	_, err := database.db.Exec(`
     CREATE TABLE IF NOT EXISTS jobs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,8 +90,9 @@ func (database *jobRepository) createJobTable() {
     )
 	`)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func (database *jobRepository) cleanCompletedJobs() error {
@@ -105,14 +109,15 @@ func (database *jobRepository) cleanCompletedJobs() error {
 	return nil
 }
 
-func (database *jobRepository) updateJobStatus(job *Job) {
+func (database *jobRepository) updateJobStatus(job *Job) error {
 	database.mu.Lock()
 	defer database.mu.Unlock()
 	_, err := database.db.Exec(`UPDATE jobs SET status = ?, attempt_count = ? WHERE id = ?`, job.status, job.attemptCount, job.id)
 
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func (database *jobRepository) recoverJobs() ([]*Job, error) {
@@ -151,7 +156,9 @@ func (database *jobRepository) recoverJobs() ([]*Job, error) {
 		}
 
 		job.status = Pending
-		database.updateJobStatus(job)
+		if err := database.updateJobStatus(job); err != nil {
+			return nil, err
+		}
 
 		jobs = append(jobs, job)
 	}
@@ -160,7 +167,7 @@ func (database *jobRepository) recoverJobs() ([]*Job, error) {
 
 }
 
-func (database *jobRepository) createJob(job *Job) {
+func (database *jobRepository) createJob(job *Job) error {
 	database.mu.Lock()
 	defer database.mu.Unlock()
 	result, err := database.db.Exec(`
@@ -183,15 +190,16 @@ func (database *jobRepository) createJob(job *Job) {
 	)
 
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	job.id = int(id)
+	return nil
 }
 
 func newQueue(size int) *jobQueue {
@@ -221,11 +229,17 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 				fmt.Printf("Worker: %d\n", workerID)
 				job.status = Processing
 				job.attemptCount++
-				repo.updateJobStatus(job)
+				if err := repo.updateJobStatus(job); err != nil {
+					fmt.Printf("Worker: %d failed to update job status: %v\n", workerID, err)
+					q.wg.Done()
+					continue
+				}
 
 				if err := q.processJob(job); err != nil {
 					job.status = Pending
-					repo.updateJobStatus(job)
+					if err := repo.updateJobStatus(job); err != nil {
+						fmt.Printf("Worker: %d failed to update job status: %v\n", workerID, err)
+					}
 					fmt.Printf("Worker: %d failed to process job: %d\n", workerID, job.id)
 
 					if job.attemptCount < job.maxAttempts {
@@ -241,7 +255,9 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 					job.status = Completed
 					// repo.updateJobStatus(job)
 				}
-				repo.updateJobStatus(job)
+				if err := repo.updateJobStatus(job); err != nil {
+					fmt.Printf("Worker: %d failed to update job status: %v\n", workerID, err)
+				}
 				q.wg.Done()
 			}
 		}(i)
@@ -265,7 +281,9 @@ func main() {
 
 	database := jobRepository{db: db}
 	defer db.Close()
-	database.createJobTable()
+	if err := database.createJobTable(); err != nil {
+		panic(err)
+	}
 
 	scheduler := Scheduler{repository: &database, tasks: q}
 
