@@ -92,9 +92,11 @@ func (database *jobRepository) createJobTable() {
 }
 
 func (database *jobRepository) cleanCompletedJobs() error {
-	_, err := database.db.Exec(`
+	res, err := database.db.Exec(`
 		DELETE FROM jobs WHERE status = "COMPLETED"
 	`)
+	numOfCleanup, err := res.RowsAffected()
+	fmt.Printf("Num of completed tasks removed is: %d\n", numOfCleanup)
 
 	if err != nil {
 		return err
