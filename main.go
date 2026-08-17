@@ -95,6 +95,9 @@ func (database *jobRepository) cleanCompletedJobs() error {
 	res, err := database.db.Exec(`
 		DELETE FROM jobs WHERE status = "COMPLETED"
 	`)
+	if err != nil {
+		return err
+	}
 	numOfCleanup, err := res.RowsAffected()
 	fmt.Printf("Num of completed tasks removed is: %d\n", numOfCleanup)
 
@@ -224,23 +227,24 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 				repo.updateJobStatus(job)
 
 				if err := q.processJob(job); err != nil {
-					job.status = Failed
+					job.status = Pending
 					repo.updateJobStatus(job)
 					fmt.Printf("Worker: %d failed to process job: %d\n", workerID, job.id)
 
 					if job.attemptCount < job.maxAttempts {
 						job.status = Pending
-						repo.updateJobStatus(job)
+						// repo.updateJobStatus(job)
 						q.enqueue(job)
-						// q.wg.Add(1)
-						// q.queue <- job
 					} else {
+						job.status = Failed
+						// repo.updateJobStatus(job)
 						fmt.Printf("Worker: %d job: %d reached max attempts\n", workerID, job.id)
 					}
 				} else {
 					job.status = Completed
-					repo.updateJobStatus(job)
+					// repo.updateJobStatus(job)
 				}
+				repo.updateJobStatus(job)
 				q.wg.Done()
 			}
 		}(i)
