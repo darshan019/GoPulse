@@ -44,6 +44,23 @@ type Scheduler struct {
 	tasks      *jobQueue
 }
 
+func (scheduler *Scheduler) submitRecoveredJobs() error {
+	jobs, err := scheduler.repository.recoverJobs()
+	if err != nil {
+		return err
+	}
+
+	for _, job := range jobs {
+		scheduler.tasks.enqueue(job)
+	}
+
+	return nil
+}
+
+func (scheduler *Scheduler) cleanUpCompletedJobs() {
+	scheduler.repository.cleanCompletedJobs()
+}
+
 func (scheduler *Scheduler) submitJob(job *Job) {
 	scheduler.repository.createJob(job)
 	scheduler.tasks.enqueue(job)
@@ -74,6 +91,18 @@ func (database *jobRepository) createJobTable() {
 	}
 }
 
+func (database *jobRepository) cleanCompletedJobs() error {
+	_, err := database.db.Exec(`
+		DELETE FROM jobs WHERE status = "COMPLETED"
+	`)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (database *jobRepository) updateJobStatus(job *Job) {
 	database.mu.Lock()
 	defer database.mu.Unlock()
@@ -82,6 +111,51 @@ func (database *jobRepository) updateJobStatus(job *Job) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (database *jobRepository) recoverJobs() ([]*Job, error) {
+	rows, err := database.db.Query(`
+		SELECT 
+			id,
+			job_type,
+			payload,
+			status,
+			created_at,
+			max_attempts,
+			attempt_count
+		FROM jobs WHERE STATUS IN ("PENDING", "PROCESSING")
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	var jobs []*Job
+
+	for rows.Next() {
+		job := &Job{}
+		err := rows.Scan(
+			&job.id,
+			&job.jobType,
+			&job.payload,
+			&job.status,
+			&job.createdAt,
+			&job.maxAttempts,
+			&job.attemptCount,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		job.status = Pending
+		database.updateJobStatus(job)
+
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
+
 }
 
 func (database *jobRepository) createJob(job *Job) {
@@ -155,9 +229,9 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 					if job.attemptCount < job.maxAttempts {
 						job.status = Pending
 						repo.updateJobStatus(job)
-
-						q.wg.Add(1)
-						q.queue <- job
+						q.enqueue(job)
+						// q.wg.Add(1)
+						// q.queue <- job
 					} else {
 						fmt.Printf("Worker: %d job: %d reached max attempts\n", workerID, job.id)
 					}
@@ -192,7 +266,13 @@ func main() {
 
 	scheduler := Scheduler{repository: &database, tasks: q}
 
+	scheduler.cleanUpCompletedJobs()
+
 	scheduler.start(5)
+
+	if err := scheduler.submitRecoveredJobs(); err != nil {
+		panic(err)
+	}
 
 	for i := 0; i < 20; i++ {
 		job := Job{
