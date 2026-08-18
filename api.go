@@ -90,7 +90,7 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
 	job, err := s.scheduler.fetchJob(id)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
