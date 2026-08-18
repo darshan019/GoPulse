@@ -33,6 +33,7 @@ func (s *Server) postJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CreateJobRequest
+	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
