@@ -1,0 +1,99 @@
+package gopulse
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+)
+
+type CreateJobRequest struct {
+	JobType string `json:"jobType"`
+	Payload string `json:"payload"`
+}
+
+type Server struct {
+	scheduler *Scheduler
+}
+
+
+func (s *Server) postJob(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Incorrect method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req CreateJobRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+	}
+
+	job := Job{
+		jobType: req.JobType,
+		payload: req.Payload,
+		status: Pending,
+		createdAt: time.Now(),
+		maxAttempts: 3,
+		attemptCount: 0,
+	}
+
+	if err := s.scheduler.submitJob(&job); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id": job.id,
+		"status": job.status,
+	})
+
+}
+
+func (s *Server) getJobs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Incorrect method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	jobs, err := s.scheduler.fetchJobs()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(jobs); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func (s *Server) jobs(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		s.postJob(w, r)
+	case http.MethodGet:
+		s.scheduler.fetchJobs()
+	}
+}
+
+func (s *Server) run(w http.ResponseWriter, r *http.Request) {
+	
+}
+
+func Api(s Scheduler) Server {
+	server := Server{scheduler: &s}
+
+	http.HandleFunc("/jobs", server.jobs)
+
+
+	err := http.ListenAndServe(":8080", nil)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return server
+}

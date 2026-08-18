@@ -1,4 +1,4 @@
-package main
+package gopulse
 
 import (
 	"database/sql"
@@ -69,6 +69,14 @@ func (scheduler *Scheduler) submitJob(job *Job) error {
 	return nil
 }
 
+func (scheduler Scheduler) fetchJobs() ([]Job, error) {
+	jobs, err := scheduler.repository.fetchJobs()
+	if err != nil {
+		return nil, err
+	}
+	return jobs, nil
+}
+
 func (scheduler *Scheduler) start(workers int) {
 	scheduler.tasks.startWorkers(workers, scheduler.repository)
 }
@@ -93,6 +101,45 @@ func (database *jobRepository) createJobTable() error {
 		return err
 	}
 	return nil
+}
+
+func (database *jobRepository) fetchJobs() ([]Job, error) {
+	rows, err := database.db.Query(`
+		SELECT id,
+			job_type,
+			payload,
+			status,
+			created_at,
+			max_attempts,
+			attempt_count
+		FROM jobs
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	var jobs []Job
+
+	for rows.Next() {
+		job := Job{}
+		err := rows.Scan(
+			&job.id,
+			&job.jobType,
+			&job.payload,
+			&job.status,
+			&job.createdAt,
+			&job.maxAttempts,
+			&job.attemptCount,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
 }
 
 func (database *jobRepository) cleanCompletedJobs() error {
