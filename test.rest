@@ -1,0 +1,12 @@
+POST http://localhost:8080/jobs
+Content-Type: application/json
+
+{
+  "jobType": "maintainence",
+  "payload": "maintainence_scripts.sh"
+}
+
+###
+
+GET http://localhost:8080/job?id=12
+Content-Type: application/json
