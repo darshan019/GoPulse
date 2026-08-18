@@ -44,6 +44,37 @@ type Scheduler struct {
 	tasks      *jobQueue
 }
 
+func (scheduler *Scheduler) fetchJob(id int) (Job, error) {
+	row := scheduler.repository.db.QueryRow(`
+		SELECT id,
+			job_type,
+			payload,
+			status,
+			created_at,
+			max_attempts,
+			attempt_count
+		FROM jobs WHERE id = ?
+	`, id)
+
+	var job Job
+
+	err := row.Scan(
+		&job.id,
+		&job.jobType,
+		&job.payload,
+		&job.status,
+		&job.createdAt,
+		&job.maxAttempts,
+		&job.attemptCount,
+	)
+
+	if err != nil {
+		return Job{}, err
+	}
+
+	return job, nil
+}
+
 func (scheduler *Scheduler) submitRecoveredJobs() error {
 	jobs, err := scheduler.repository.recoverJobs()
 	if err != nil {
