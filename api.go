@@ -79,13 +79,15 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+		http.Error(w, "invalid id", http.StatusInternalServerError)
 		return
 	}
 
-	job, err := s.scheduler.fetchJob(int(id))
+	job, err := s.scheduler.fetchJob(id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -151,6 +153,7 @@ func Api(s *Scheduler) {
 	server := Server{scheduler: s}
 
 	http.HandleFunc("/jobs", server.jobs)
+	http.HandleFunc("/job", server.getJob)
 	err := http.ListenAndServe(":8080", nil)
 
 	if err != nil {
