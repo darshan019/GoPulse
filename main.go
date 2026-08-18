@@ -384,21 +384,23 @@ func main() {
 		panic(err)
 	}
 
-	for i := 0; i < 20; i++ {
-		job := Job{
-			jobType:      "send_mail",
-			payload:      "some payload to send",
-			status:       Pending,
-			createdAt:    time.Now(),
-			maxAttempts:  3,
-			attemptCount: 0,
-		}
+	// for i := 0; i < 20; i++ {
+	// 	job := Job{
+	// 		jobType:      "send_mail",
+	// 		payload:      "some payload to send",
+	// 		status:       Pending,
+	// 		createdAt:    time.Now(),
+	// 		maxAttempts:  3,
+	// 		attemptCount: 0,
+	// 	}
 
-		// scheduler.submitJob(&job)
-		if err := scheduler.submitJob(&job); err != nil {
-			fmt.Printf("failed to submit job: %v\n", err)
-		}
-	}
+	// 	// scheduler.submitJob(&job)
+	// 	if err := scheduler.submitJob(&job); err != nil {
+	// 		fmt.Printf("failed to submit job: %v\n", err)
+	// 	}
+	// }
+
+	Api(&scheduler)
 
 	scheduler.Wait()
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -84,7 +85,7 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
-		http.Error(w, "invalid id", http.StatusInternalServerError)
+		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
@@ -147,7 +148,7 @@ func (s *Server) jobs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) run(w http.ResponseWriter, r *http.Request) {
-
+	panic("yet tto implement")
 }
 
 func Api(s *Scheduler) {
@@ -155,6 +156,8 @@ func Api(s *Scheduler) {
 
 	http.HandleFunc("/jobs", server.jobs)
 	http.HandleFunc("/job", server.getJob)
+
+	fmt.Println("Listening on port 8080")
 	err := http.ListenAndServe(":8080", nil)
 
 	if err != nil {
