@@ -1,4 +1,4 @@
-package gopulse
+package main
 
 import (
 	"encoding/json"
@@ -15,7 +15,6 @@ type Server struct {
 	scheduler *Scheduler
 }
 
-
 func (s *Server) postJob(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Incorrect method not allowed", http.StatusMethodNotAllowed)
@@ -26,31 +25,33 @@ func (s *Server) postJob(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
 	}
 
 	job := Job{
-		jobType: req.JobType,
-		payload: req.Payload,
-		status: Pending,
-		createdAt: time.Now(),
-		maxAttempts: 3,
+		jobType:      req.JobType,
+		payload:      req.Payload,
+		status:       Pending,
+		createdAt:    time.Now(),
+		maxAttempts:  3,
 		attemptCount: 0,
 	}
 
 	if err := s.scheduler.submitJob(&job); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]any{
-		"id": job.id,
+		"id":     job.id,
 		"status": job.status,
 	})
 
 }
 
 func (s *Server) getJobs(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodGet {
 		http.Error(w, "Incorrect method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -75,25 +76,21 @@ func (s *Server) jobs(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		s.postJob(w, r)
 	case http.MethodGet:
-		s.scheduler.fetchJobs()
+		s.getJobs(w, r)
 	}
 }
 
 func (s *Server) run(w http.ResponseWriter, r *http.Request) {
-	
+
 }
 
-func Api(s Scheduler) Server {
-	server := Server{scheduler: &s}
+func Api(s *Scheduler) {
+	server := Server{scheduler: s}
 
 	http.HandleFunc("/jobs", server.jobs)
-
-
 	err := http.ListenAndServe(":8080", nil)
 
 	if err != nil {
 		panic(err)
 	}
-
-	return server
 }

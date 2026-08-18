@@ -1,4 +1,4 @@
-package gopulse
+package main
 
 import (
 	"database/sql"
@@ -119,6 +119,7 @@ func (database *jobRepository) fetchJobs() ([]Job, error) {
 	}
 
 	var jobs []Job
+	defer rows.Close()
 
 	for rows.Next() {
 		job := Job{}
@@ -137,6 +138,10 @@ func (database *jobRepository) fetchJobs() ([]Job, error) {
 		}
 
 		jobs = append(jobs, job)
+	}
+
+	if err := rows.Err(); err != nil {
+    	return nil, err
 	}
 
 	return jobs, nil
@@ -208,6 +213,10 @@ func (database *jobRepository) recoverJobs() ([]*Job, error) {
 		}
 
 		jobs = append(jobs, job)
+	}
+
+	if err := rows.Err(); err != nil {
+    	return nil, err
 	}
 
 	return jobs, nil
@@ -354,7 +363,10 @@ func main() {
 			attemptCount: 0,
 		}
 
-		scheduler.submitJob(&job)
+		// scheduler.submitJob(&job)
+		if err := scheduler.submitJob(&job); err != nil {
+			fmt.Printf("failed to submit job: %v\n", err)
+		}
 	}
 
 	scheduler.Wait()
