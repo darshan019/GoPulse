@@ -6,6 +6,16 @@ import (
 	"time"
 )
 
+type JobResponse struct {
+	ID           int       `json:"id"`
+	JobType      string    `json:"jobType"`
+	Payload      string    `json:"payload"`
+	Status       JobStatus `json:"status"`
+	CreatedAt    time.Time `json:"createdAt"`
+	MaxAttempts  int       `json:"maxAttempts"`
+	AttemptCount int       `json:"attemptCount"`
+}
+
 type CreateJobRequest struct {
 	JobType string `json:"jobType"`
 	Payload string `json:"payload"`
@@ -50,6 +60,18 @@ func (s *Server) postJob(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func toResponse(job Job) JobResponse {
+	return JobResponse{
+		ID:           job.id,
+		JobType:      job.jobType,
+		Payload:      job.payload,
+		Status:       job.status,
+		CreatedAt:    job.createdAt,
+		MaxAttempts:  job.maxAttempts,
+		AttemptCount: job.attemptCount,
+	}
+}
+
 func (s *Server) getJobs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Incorrect method not allowed", http.StatusMethodNotAllowed)
@@ -64,7 +86,14 @@ func (s *Server) getJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(jobs); err != nil {
+	var jobResponses []JobResponse
+
+	for _, job := range jobs {
+		jobResponse := toResponse(job)
+		jobResponses = append(jobResponses, jobResponse)
+	}
+
+	if err := json.NewEncoder(w).Encode(jobResponses); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -77,6 +106,12 @@ func (s *Server) jobs(w http.ResponseWriter, r *http.Request) {
 		s.postJob(w, r)
 	case http.MethodGet:
 		s.getJobs(w, r)
+	default:
+		http.Error(
+			w,
+			"method not allowed",
+			http.StatusMethodNotAllowed,
+		)
 	}
 }
 
