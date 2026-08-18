@@ -306,6 +306,8 @@ func (q *jobQueue) processJob(job *Job) error {
 		return fmt.Errorf("An deliberate error")
 	}
 	fmt.Printf("Processing job: %s, payload: %s\n", job.jobType, job.payload)
+	time.Sleep(1 * time.Second)
+	fmt.Printf("Job completed. Id: %d, Payload: %s\n", job.id, job.payload)
 	return nil
 }
 

@@ -89,6 +89,8 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println(id)
+
 	job, err := s.scheduler.fetchJob(id)
 
 	if err != nil {
