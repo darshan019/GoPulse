@@ -34,7 +34,7 @@ Scheduler
 +-------------+
 |   SQLite    |
 +------+------+
-       ↑ 
+       ↑
 +-----------+    +-----+-----+    +-----------+
 | Scheduler | -> | Job Queue | -> | Workers   |
 +-----------+    +-----------+    +-----------+
@@ -110,10 +110,10 @@ database/sql
 - Status management
 - Startup recovery
 - Completed job cleanup
+- REST API
+- Graceful shutdown
 
 ## Planned Enhancements
 
 - Structured logging
-- REST API
-- Graceful shutdown
 - Metrics and monitoring

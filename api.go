@@ -160,7 +160,6 @@ func Api(s *Scheduler) *http.Server {
 	http.HandleFunc("/job", server.getJob)
 
 	fmt.Println("Listening on port 8080")
-	// err := http.ListenAndServe(":8080", nil)
 
 	httpSrv := http.Server{
 		Addr: ":8080",
