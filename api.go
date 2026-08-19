@@ -153,16 +153,18 @@ func (s *Server) run(w http.ResponseWriter, r *http.Request) {
 	panic("yet tto implement")
 }
 
-func Api(s *Scheduler) {
+func Api(s *Scheduler) *http.Server {
 	server := Server{scheduler: s}
 
 	http.HandleFunc("/jobs", server.jobs)
 	http.HandleFunc("/job", server.getJob)
 
 	fmt.Println("Listening on port 8080")
-	err := http.ListenAndServe(":8080", nil)
+	// err := http.ListenAndServe(":8080", nil)
 
-	if err != nil {
-		panic(err)
+	httpSrv := http.Server{
+		Addr: ":8080",
 	}
+
+	return &httpSrv
 }

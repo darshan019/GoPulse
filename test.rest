@@ -8,5 +8,5 @@ Content-Type: application/json
 
 ###
 
-GET http://localhost:8080/job?id=9
+GET http://localhost:8080/jobs?id=9
 Content-Type: application/json

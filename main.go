@@ -1,7 +1,12 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	_ "modernc.org/sqlite"
 
@@ -333,16 +338,13 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 
 					if job.attemptCount < job.maxAttempts {
 						job.status = Pending
-						// repo.updateJobStatus(job)
 						q.enqueue(job)
 					} else {
 						job.status = Failed
-						// repo.updateJobStatus(job)
 						fmt.Printf("Worker: %d job: %d reached max attempts\n", workerID, job.id)
 					}
 				} else {
 					job.status = Completed
-					// repo.updateJobStatus(job)
 				}
 				if err := repo.updateJobStatus(job); err != nil {
 					fmt.Printf("Worker: %d failed to update job status: %v\n", workerID, err)
@@ -353,7 +355,25 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 	}
 }
 
+func (scheduler *Scheduler) shutdown(srv *http.Server) {
+	ctx, cancel := context.WithCancel(context.Background()) // works with WithTimeout also
+	defer cancel()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	<-stop                                    // blocks, effectively allowing normal execution of program
+	if err := srv.Shutdown(ctx); err != nil { // stop listening to incoming requests
+		fmt.Printf("%s\n", err.Error())
+	}
+
+	scheduler.Wait() // Wait for workers to finish their tasks [when cancelled]
+	fmt.Println("Workers stopped")
+}
+
 func main() {
+	workers := 5
+
 	q := newQueue(10)
 
 	start := time.Now()
@@ -380,31 +400,21 @@ func main() {
 		panic(err)
 	}
 
-	scheduler.start(5)
+	scheduler.start(workers)
 
 	if err := scheduler.submitRecoveredJobs(); err != nil {
 		panic(err)
 	}
 
-	// for i := 0; i < 20; i++ {
-	// 	job := Job{
-	// 		jobType:      "send_mail",
-	// 		payload:      "some payload to send",
-	// 		status:       Pending,
-	// 		createdAt:    time.Now(),
-	// 		maxAttempts:  3,
-	// 		attemptCount: 0,
-	// 	}
+	server := Api(&scheduler)
 
-	// 	// scheduler.submitJob(&job)
-	// 	if err := scheduler.submitJob(&job); err != nil {
-	// 		fmt.Printf("failed to submit job: %v\n", err)
-	// 	}
-	// }
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			panic(err)
+		}
+	}()
 
-	Api(&scheduler)
-
-	scheduler.Wait()
+	scheduler.shutdown(server)
 
 	fmt.Println("All jobs processed in:", time.Since(start))
 
