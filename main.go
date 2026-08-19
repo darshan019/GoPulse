@@ -364,7 +364,7 @@ func (scheduler *Scheduler) shutdown(srv *http.Server) {
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
 	<-stop // blocks, effectively allowing normal execution of program
-	fmt.Println("Shutdown Initiated")
+	fmt.Println("\nShutdown Initiated")
 	if err := srv.Shutdown(ctx); err != nil { // stop listening to incoming requests
 		fmt.Printf("%s\n", err.Error())
 	}
