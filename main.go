@@ -330,15 +330,16 @@ func (q *jobQueue) startWorkers(workers int, repo *jobRepository) {
 				}
 
 				if err := q.processJob(job); err != nil {
-					job.status = Pending
-					if err := repo.updateJobStatus(job); err != nil {
-						fmt.Printf("Worker: %d failed to update job status: %v\n", workerID, err)
-					}
 					fmt.Printf("Worker: %d failed to process job: %d\n", workerID, job.id)
 
 					if job.attemptCount < job.maxAttempts {
 						job.status = Pending
+						if err := repo.updateJobStatus(job); err != nil {
+							fmt.Printf("Worker: %d failed to update job status: %v\n", workerID, err)
+						}
 						q.enqueue(job)
+						q.wg.Done()
+						continue
 					} else {
 						job.status = Failed
 						fmt.Printf("Worker: %d job: %d reached max attempts\n", workerID, job.id)
