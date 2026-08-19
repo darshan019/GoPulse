@@ -54,11 +54,11 @@ func (s *Server) postJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	id := job.id
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]any{
-		"id":     job.id,
-		"status": job.status,
+		"id":     id,
+		"status": Pending,
 	})
 
 }
